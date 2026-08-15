@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="Download videos from YouTube, TikTok, Instagram, Facebook, X, Twitch and Pinterest."
+    >
+
+    <title>SocialDL — Social Media Downloader</title>
+
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body>
+
+    <!-- ================= NAVBAR ================= -->
+
+    <header class="navbar">
+
+        <a href="./index.html" class="logo">
+            <span class="logo-icon">S</span>
+            <span>Social<span>DL</span></span>
+        </a>
+
+        <nav class="nav-links">
+            <a href="./index.html">Home</a>
+            <a href="#supported">Platforms</a>
+            <a href="#how">How it works</a>
+        </nav>
+
+        <div class="nav-right">
+
+            <a
+                href="./history.html"
+                class="history-link"
+                id="historyLink"
+            >
+                History
+            </a>
+
+            <div id="userArea">
+                <a
+                    href="./login.html"
+                    class="login-button"
+                >
+                    Sign in
+                </a>
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- ================= HERO ================= -->
+
+    <main>
+
+        <section class="hero">
+
+            <div class="hero-glow glow-one"></div>
+            <div class="hero-glow glow-two"></div>
+
+            <div class="hero-content">
+
+                <div class="badge">
+                    <span class="pulse"></span>
+                    Fast • Free • Simple
+                </div>
+
+                <h1>
+                    Download your
+                    <span>favorite videos.</span>
+                </h1>
+
+                <p>
+                    Download videos from your favorite social platforms
+                    in seconds. Paste a link and let SocialDL do the work.
+                </p>
+
+
+                <!-- ================= SEARCH BOX ================= -->
+
+                <div class="download-box">
+
+                    <div class="input-wrapper">
+
+                        <span class="link-icon">🔗</span>
+
+                        <input
+                            type="url"
+                            id="videoUrl"
+                            placeholder="Paste your video link here..."
+                            autocomplete="off"
+                        >
+
+                        <button
+                            type="button"
+                            id="clearButton"
+                            class="clear-button"
+                        >
+                            ×
+                        </button>
+
+                    </div>
+
+                    <button
+                        type="button"
+                        id="downloadButton"
+                        class="download-button"
+                    >
+                        <span id="downloadButtonText">
+                            Download
+                        </span>
+
+                        <span
+                            id="downloadSpinner"
+                            class="spinner hidden"
+                        ></span>
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="errorMessage"
+                    class="error-message hidden"
+                ></div>
+
+
+                <!-- ================= SUPPORTED ================= -->
+
+                <div class="supported-mini">
+
+                    <span>Supports:</span>
+
+                    <span>▶ YouTube</span>
+                    <span>♪ TikTok</span>
+                    <span>◎ Instagram</span>
+                    <span>f Facebook</span>
+                    <span>𝕏 X</span>
+                    <span>◉ Twitch</span>
+                    <span>📌 Pinterest</span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= RESULT ================= -->
+
+        <section
+            id="resultSection"
+            class="result-section hidden"
+        >
+
+            <div class="result-container">
+
+                <div class="result-card">
+
+                    <div class="thumbnail-container">
+
+                        <img
+                            id="videoThumbnail"
+                            src=""
+                            alt="Video thumbnail"
+                        >
+
+                        <div
+                            id="platformBadge"
+                            class="platform-badge"
+                        >
+                            Platform
+                        </div>
+
+                    </div>
+
+
+                    <div class="video-info">
+
+                        <h2 id="videoTitle">
+                            Video title
+                        </h2>
+
+                        <p id="videoDescription">
+                            Video description
+                        </p>
+
+
+                        <div class="video-meta">
+
+                            <span id="videoUploader">
+                                👤 Unknown
+                            </span>
+
+                            <span id="videoDuration">
+                                ⏱ Unknown
+                            </span>
+
+                        </div>
+
+
+                        <div class="format-title">
+                            Available formats
+                        </div>
+
+                        <div
+                            id="formatList"
+                            class="format-list"
+                        ></div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= SUPPORTED PLATFORMS ================= -->
+
+        <section
+            id="supported"
+            class="platforms-section"
+        >
+
+            <div class="section-heading">
+
+                <span class="section-label">
+                    SUPPORTED PLATFORMS
+                </span>
+
+                <h2>
+                    One downloader.
+                    <span>Multiple platforms.</span>
+                </h2>
+
+                <p>
+                    Download publicly available content from the
+                    platforms you use every day.
+                </p>
+
+            </div>
+
+
+            <div class="platform-grid">
+
+                <div class="platform-card">
+                    <div class="platform-icon youtube">▶</div>
+                    <h3>YouTube</h3>
+                    <p>Videos & audio</p>
+                </div>
+
+                <div class="platform-card">
+                    <div class="platform-icon tiktok">♪</div>
+                    <h3>TikTok</h3>
+                    <p>Videos</p>
+                </div>
+
+                <div class="platform-card">
+                    <div class="platform-icon instagram">◎</div>
+                    <h3>Instagram</h3>
+                    <p>Reels & videos</p>
+                </div>
+
+                <div class="platform-card">
+                    <div class="platform-icon facebook">f</div>
+                    <h3>Facebook</h3>
+                    <p>Public videos</p>
+                </div>
+
+                <div class="platform-card">
+                    <div class="platform-icon twitter">𝕏</div>
+                    <h3>X / Twitter</h3>
+                    <p>Videos</p>
+                </div>
+
+                <div class="platform-card">
+                    <div class="platform-icon twitch">◉</div>
+                    <h3>Twitch</h3>
+                    <p>Public clips</p>
+                </div>
+
+                <div class="platform-card">
+                    <div class="platform-icon pinterest">📌</div>
+                    <h3>Pinterest</h3>
+                    <p>Video pins</p>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= HOW ================= -->
+
+        <section
+            id="how"
+            class="how-section"
+        >
+
+            <div class="section-heading">
+
+                <span class="section-label">
+                    HOW IT WORKS
+                </span>
+
+                <h2>
+                    Download in
+                    <span>three steps.</span>
+                </h2>
+
+            </div>
+
+
+            <div class="steps">
+
+                <div class="step">
+                    <div class="step-number">01</div>
+                    <h3>Copy the link</h3>
+                    <p>
+                        Copy the URL of the video you want.
+                    </p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">02</div>
+                    <h3>Paste it</h3>
+                    <p>
+                        Paste the link into SocialDL.
+                    </p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">03</div>
+                    <h3>Download</h3>
+                    <p>
+                        Select your preferred format and download.
+                    </p>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- ================= FOOTER ================= -->
+
+    <footer>
+
+        <div class="footer-logo">
+            SocialDL
+        </div>
+
+        <p>
+            Download responsibly. Only download content
+            you have permission to use.
+        </p>
+
+        <p>
+            © 2026 SocialDL
+        </p>
+
+    </footer>
+
+
+    <script
+        type="module"
+        src="./js/app.js"
+    ></script>
+
+</body>
+</html>
