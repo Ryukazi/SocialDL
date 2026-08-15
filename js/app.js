@@ -6,20 +6,18 @@ import {
     signInWithPopup,
     onAuthStateChanged,
     signOut,
-
     db,
     collection,
     addDoc,
     serverTimestamp
 } from "./auth.js";
 
-
 /* =========================================
    CONFIG
 ========================================= */
 
-const API_ENDPOINT = "https://social-chi-amber.vercel.app/api/download?url=";
-
+const API_BASE =
+    "https://social-chi-amber.vercel.app/api/download";
 
 /* =========================================
    DOM
@@ -70,35 +68,27 @@ const formatList =
 const userArea =
     document.getElementById("userArea");
 
-
 /* =========================================
    CURRENT USER
 ========================================= */
 
 let currentUser = null;
 
-
 /* =========================================
    AUTH STATE
 ========================================= */
 
 onAuthStateChanged(auth, (user) => {
-
     currentUser = user;
-
     renderUser(user);
-
 });
-
 
 /* =========================================
    USER UI
 ========================================= */
 
 function renderUser(user) {
-
     if (!user) {
-
         userArea.innerHTML = `
             <a
                 href="./login.html"
@@ -111,48 +101,54 @@ function renderUser(user) {
         return;
     }
 
-
     const photo = user.photoURL || "";
 
     userArea.innerHTML = `
-
         <div class="user-menu">
 
             <button
                 class="user-button"
                 id="userButton"
+                type="button"
             >
-
                 ${
                     photo
-                    ? `<img src="${escapeHTML(photo)}" alt="User">`
-                    : `<span class="user-placeholder">👤</span>`
+                        ? `
+                            <img
+                                src="${escapeHTML(photo)}"
+                                alt="User"
+                            >
+                        `
+                        : `
+                            <span class="user-placeholder">
+                                👤
+                            </span>
+                        `
                 }
 
                 <span>
                     ${escapeHTML(user.displayName || "User")}
                 </span>
-
             </button>
 
             <div
                 class="user-dropdown hidden"
                 id="userDropdown"
             >
-
                 <a href="./history.html">
                     Download history
                 </a>
 
-                <button id="logoutButton">
+                <button
+                    id="logoutButton"
+                    type="button"
+                >
                     Sign out
                 </button>
-
             </div>
 
         </div>
     `;
-
 
     const userButton =
         document.getElementById("userButton");
@@ -163,148 +159,161 @@ function renderUser(user) {
     const logoutButton =
         document.getElementById("logoutButton");
 
-
     userButton.addEventListener("click", () => {
-
         userDropdown.classList.toggle("hidden");
-
     });
-
 
     logoutButton.addEventListener(
         "click",
         async () => {
-
             try {
-
                 await signOut(auth);
-
-                location.reload();
-
             } catch (error) {
-
-                console.error(error);
-
+                console.error(
+                    "Logout error:",
+                    error
+                );
             }
-
         }
     );
-
 }
 
-
 /* =========================================
-   DOWNLOAD
+   DOWNLOAD EVENTS
 ========================================= */
 
-downloadButton.addEventListener(
-    "click",
-    downloadVideo
-);
+if (downloadButton) {
+    downloadButton.addEventListener(
+        "click",
+        downloadVideo
+    );
+}
 
-
-videoUrlInput.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (event.key === "Enter") {
-
-            downloadVideo();
-
+if (videoUrlInput) {
+    videoUrlInput.addEventListener(
+        "keydown",
+        (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                downloadVideo();
+            }
         }
+    );
+}
 
-    }
-);
-
+/* =========================================
+   DOWNLOAD VIDEO
+========================================= */
 
 async function downloadVideo() {
-
     const url =
         videoUrlInput.value.trim();
 
-
     hideError();
 
-
     if (!url) {
-
         showError(
             "Please paste a video URL first."
         );
 
         return;
-
     }
 
-
     if (!isValidURL(url)) {
-
         showError(
             "Please enter a valid URL."
         );
 
         return;
-
     }
-
 
     setLoading(true);
 
-
     resultSection.classList.add("hidden");
 
-
     try {
+        /*
+         * IMPORTANT:
+         *
+         * API_BASE already contains /api/download.
+         *
+         * We use URLSearchParams instead of
+         * manually creating ?url=.
+         */
 
         const apiURL =
-            `${API_ENDPOINT}?url=${encodeURIComponent(url)}`;
+            `${API_BASE}?url=${encodeURIComponent(url)}`;
 
+        console.log(
+            "Requesting:",
+            apiURL
+        );
 
         const response =
-            await fetch(apiURL);
+            await fetch(apiURL, {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                }
+            });
 
+        console.log(
+            "API status:",
+            response.status
+        );
 
-        if (!response.ok) {
+        const text =
+            await response.text();
+
+        let data;
+
+        try {
+            data = JSON.parse(text);
+        } catch {
+            console.error(
+                "API returned non-JSON:",
+                text
+            );
 
             throw new Error(
                 `Server returned ${response.status}`
             );
-
         }
 
+        console.log(
+            "Downloader API:",
+            data
+        );
 
-        const data =
-            await response.json();
-
-
-        console.log("Downloader API:", data);
-
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                data.message ||
+                `Server returned ${response.status}`
+            );
+        }
 
         if (!data.success) {
-
             throw new Error(
                 data.error ||
                 data.message ||
                 "Unable to process this URL."
             );
-
         }
-
 
         displayResult(data);
 
-
-        await saveDownloadHistory(data, url);
-
+        await saveDownloadHistory(
+            data,
+            url
+        );
 
         resultSection.scrollIntoView({
             behavior: "smooth",
             block: "start"
         });
 
-
     } catch (error) {
-
         console.error(
             "Download error:",
             error
@@ -313,116 +322,95 @@ async function downloadVideo() {
         showError(
             getFriendlyError(error)
         );
-
     } finally {
-
         setLoading(false);
-
     }
-
 }
-
 
 /* =========================================
    DISPLAY RESULT
 ========================================= */
 
 function displayResult(data) {
-
-    resultSection.classList.remove("hidden");
-
+    resultSection.classList.remove(
+        "hidden"
+    );
 
     videoThumbnail.src =
         data.thumbnail || "";
 
-
     videoThumbnail.onerror = () => {
-
         videoThumbnail.src =
             "https://placehold.co/800x450/111/fff?text=No+Thumbnail";
-
     };
-
 
     videoTitle.textContent =
         data.title ||
         "Untitled video";
 
-
     videoDescription.textContent =
         data.description ||
         "No description available.";
 
-
     videoUploader.textContent =
         `👤 ${data.uploader || "Unknown"}`;
 
-
     if (data.duration) {
-
         videoDuration.textContent =
             `⏱ ${formatDuration(data.duration)}`;
-
     } else {
-
         videoDuration.textContent =
             "⏱ Unknown";
-
     }
-
 
     platformBadge.textContent =
         data.platform ||
         "Video";
 
-
     formatList.innerHTML = "";
 
-
     /*
-     * Always put the best format first.
+     * BEST FORMAT
      */
 
-    if (data.best && data.best.download_url) {
-
+    if (
+        data.best &&
+        data.best.download_url
+    ) {
         addFormatButton(
             data.best,
             true
         );
-
     }
 
-
     /*
-     * Add other formats.
+     * OTHER FORMATS
      */
 
     if (
         Array.isArray(data.formats)
     ) {
-
         const seen =
             new Set();
 
-        if (data.best) {
-
+        if (
+            data.best &&
+            data.best.download_url
+        ) {
             seen.add(
                 data.best.download_url
             );
-
         }
-
 
         for (
             const format of data.formats
         ) {
-
             if (
+                !format ||
                 !format.download_url
             ) {
                 continue;
             }
-
 
             if (
                 seen.has(
@@ -432,23 +420,40 @@ function displayResult(data) {
                 continue;
             }
 
-
             seen.add(
                 format.download_url
             );
-
 
             addFormatButton(
                 format,
                 false
             );
-
         }
-
     }
 
-}
+    /*
+     * No formats
+     */
 
+    if (
+        formatList.children.length === 0
+    ) {
+        formatList.innerHTML = `
+            <div class="format-item">
+                <div class="format-info">
+                    <strong>
+                        No downloadable format
+                    </strong>
+
+                    <span>
+                        The API did not return a
+                        downloadable file.
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+}
 
 /* =========================================
    FORMAT BUTTON
@@ -458,14 +463,11 @@ function addFormatButton(
     format,
     isBest
 ) {
-
     const item =
         document.createElement("div");
 
-
     item.className =
         "format-item";
-
 
     const resolution =
         format.resolution ||
@@ -476,7 +478,6 @@ function addFormatButton(
                 : "Available"
         );
 
-
     const type =
         format.audio_only
             ? "Audio"
@@ -484,15 +485,14 @@ function addFormatButton(
                 ? "Video only"
                 : "Video";
 
-
     const size =
         format.filesize
-            ? formatBytes(format.filesize)
+            ? formatBytes(
+                format.filesize
+            )
             : "";
 
-
     item.innerHTML = `
-
         <div class="format-info">
 
             <strong>
@@ -501,193 +501,165 @@ function addFormatButton(
 
             <span>
                 ${escapeHTML(type)}
-                ${size ? ` • ${escapeHTML(size)}` : ""}
+
+                ${
+                    size
+                        ? ` • ${escapeHTML(size)}`
+                        : ""
+                }
+
                 ${
                     isBest
-                    ? " • Recommended"
-                    : ""
+                        ? " • Recommended"
+                        : ""
                 }
             </span>
 
         </div>
 
-        <button class="format-download">
+        <button
+            class="format-download"
+            type="button"
+        >
             Download
         </button>
-
     `;
-
 
     const button =
         item.querySelector(
             ".format-download"
         );
 
-
     button.addEventListener(
         "click",
         () => {
-
             downloadFile(
                 format.download_url,
                 format.ext || "mp4"
             );
-
         }
     );
 
-
     formatList.appendChild(item);
-
 }
 
-
 /* =========================================
-   ACTUAL FILE DOWNLOAD
+   DOWNLOAD FILE
 ========================================= */
 
 function downloadFile(
     url,
     extension = "mp4"
 ) {
-
     if (!url) {
-
         showError(
             "Download URL is missing."
         );
 
         return;
-
     }
 
-
     /*
-     * Open the signed CDN URL.
+     * Signed CDN URLs from TikTok/Instagram
+     * may not honor the HTML download attribute.
      *
-     * Your API currently returns direct
-     * TikTok/Instagram CDN URLs.
+     * Opening the URL is the most reliable
+     * browser-side method.
      */
 
     const link =
         document.createElement("a");
 
-
     link.href = url;
 
     link.target = "_blank";
 
-    link.rel = "noopener noreferrer";
-
-
-    /*
-     * Browser decides whether to download
-     * or open depending on the CDN headers.
-     */
+    link.rel =
+        "noopener noreferrer";
 
     link.download =
         `SocialDL.${extension}`;
-
 
     document.body.appendChild(link);
 
     link.click();
 
     link.remove();
-
 }
 
-
 /* =========================================
-   SAVE HISTORY
+   SAVE DOWNLOAD HISTORY
 ========================================= */
 
 async function saveDownloadHistory(
     data,
     originalURL
 ) {
-
-    /*
-     * User doesn't have to log in to download.
-     *
-     * History is saved only for logged-in users.
-     */
-
     if (!currentUser) {
-
         return;
-
     }
 
-
     try {
-
         await addDoc(
-
             collection(
                 db,
                 "users",
                 currentUser.uid,
                 "downloads"
             ),
-
             {
-
                 platform:
-                    data.platform || "Unknown",
+                    data.platform ||
+                    "Unknown",
 
                 title:
-                    data.title || "Untitled",
+                    data.title ||
+                    "Untitled",
 
                 thumbnail:
-                    data.thumbnail || "",
+                    data.thumbnail ||
+                    "",
 
                 originalURL:
                     originalURL,
 
                 downloadURL:
-                    data.best?.download_url || "",
+                    data.best?.download_url ||
+                    "",
 
                 createdAt:
                     serverTimestamp()
-
             }
-
         );
 
     } catch (error) {
-
         console.error(
             "History save failed:",
             error
         );
-
     }
-
 }
-
 
 /* =========================================
    CLEAR INPUT
 ========================================= */
 
-clearButton.addEventListener(
-    "click",
-    () => {
+if (clearButton) {
+    clearButton.addEventListener(
+        "click",
+        () => {
+            videoUrlInput.value = "";
 
-        videoUrlInput.value = "";
+            resultSection.classList.add(
+                "hidden"
+            );
 
-        resultSection.classList.add(
-            "hidden"
-        );
+            hideError();
 
-        hideError();
-
-        videoUrlInput.focus();
-
-    }
-);
-
+            videoUrlInput.focus();
+        }
+    );
+}
 
 /* =========================================
    LOADING
@@ -696,33 +668,25 @@ clearButton.addEventListener(
 function setLoading(
     loading
 ) {
-
     downloadButton.disabled =
         loading;
 
-
     if (loading) {
-
         downloadButtonText.textContent =
             "Processing...";
 
         downloadSpinner.classList.remove(
             "hidden"
         );
-
     } else {
-
         downloadButtonText.textContent =
             "Download";
 
         downloadSpinner.classList.add(
             "hidden"
         );
-
     }
-
 }
-
 
 /* =========================================
    ERROR
@@ -731,27 +695,22 @@ function setLoading(
 function showError(
     message
 ) {
-
     errorMessage.textContent =
         message;
 
     errorMessage.classList.remove(
         "hidden"
     );
-
 }
 
-
 function hideError() {
-
-    errorMessage.textContent = "";
+    errorMessage.textContent =
+        "";
 
     errorMessage.classList.add(
         "hidden"
     );
-
 }
-
 
 /* =========================================
    URL VALIDATION
@@ -760,9 +719,7 @@ function hideError() {
 function isValidURL(
     value
 ) {
-
     try {
-
         const url =
             new URL(value);
 
@@ -772,13 +729,9 @@ function isValidURL(
         );
 
     } catch {
-
         return false;
-
     }
-
 }
-
 
 /* =========================================
    DURATION
@@ -787,45 +740,43 @@ function isValidURL(
 function formatDuration(
     seconds
 ) {
-
     seconds =
         Number(seconds);
 
-
-    if (!Number.isFinite(seconds)) {
-
+    if (
+        !Number.isFinite(seconds)
+    ) {
         return "Unknown";
-
     }
 
-
     const hours =
-        Math.floor(seconds / 3600);
-
+        Math.floor(
+            seconds / 3600
+        );
 
     const minutes =
         Math.floor(
             (seconds % 3600) / 60
         );
 
-
     const secs =
         Math.floor(
             seconds % 60
         );
 
-
     if (hours > 0) {
-
-        return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-
+        return (
+            `${hours}:` +
+            `${String(minutes).padStart(2, "0")}:` +
+            `${String(secs).padStart(2, "0")}`
+        );
     }
 
-
-    return `${minutes}:${String(secs).padStart(2, "0")}`;
-
+    return (
+        `${minutes}:` +
+        `${String(secs).padStart(2, "0")}`
+    );
 }
-
 
 /* =========================================
    FILE SIZE
@@ -834,13 +785,9 @@ function formatDuration(
 function formatBytes(
     bytes
 ) {
-
     if (!bytes) {
-
         return "";
-
     }
-
 
     const units = [
         "B",
@@ -849,28 +796,23 @@ function formatBytes(
         "GB"
     ];
 
-
     let index = 0;
 
-    let value = Number(bytes);
-
+    let value =
+        Number(bytes);
 
     while (
         value >= 1024 &&
         index < units.length - 1
     ) {
-
         value /= 1024;
-
         index++;
-
     }
 
-
-    return `${value.toFixed(1)} ${units[index]}`;
-
+    return (
+        `${value.toFixed(1)} ${units[index]}`
+    );
 }
-
 
 /* =========================================
    HTML ESCAPE
@@ -879,16 +821,28 @@ function formatBytes(
 function escapeHTML(
     value
 ) {
-
     return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
 }
-
 
 /* =========================================
    FRIENDLY ERRORS
@@ -897,48 +851,56 @@ function escapeHTML(
 function getFriendlyError(
     error
 ) {
-
     const message =
         error?.message || "";
 
-
     if (
-        message.includes("Failed to fetch")
+        message.includes(
+            "Failed to fetch"
+        )
     ) {
-
         return (
             "Could not connect to the downloader API. " +
-            "Please check that your API is running."
+            "Check your API, CORS settings, and deployment."
         );
-
     }
-
 
     if (
         message.includes("404")
     ) {
-
         return (
-            "Downloader API endpoint was not found."
+            "Downloader API endpoint returned 404. " +
+            "Check the API URL."
         );
-
     }
 
+    if (
+        message.includes("401") ||
+        message.includes("403")
+    ) {
+        return (
+            "The downloader server rejected the request."
+        );
+    }
+
+    if (
+        message.includes("429")
+    ) {
+        return (
+            "Too many requests. Please wait and try again."
+        );
+    }
 
     if (
         message.includes("500")
     ) {
-
         return (
             "The downloader server encountered an error."
         );
-
     }
-
 
     return (
         message ||
         "Something went wrong."
     );
-
 }
