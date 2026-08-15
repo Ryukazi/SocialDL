@@ -18,7 +18,7 @@ import {
    CONFIG
 ========================================= */
 
-const API_ENDPOINT = "https://social-chi-amber.vercel.app/api/download=";
+const API_ENDPOINT = "https://social-chi-amber.vercel.app/api/download?url=";
 
 
 /* =========================================
