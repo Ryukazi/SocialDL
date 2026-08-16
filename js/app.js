@@ -4,6 +4,7 @@ import {
     auth,
     onAuthStateChanged,
     signOut,
+
     db,
     collection,
     addDoc,
@@ -12,17 +13,14 @@ import {
 
 
 /* =========================================
-   CONFIG
+   API CONFIG
 ========================================= */
 
-const MAIN_API =
+const SOCIAL_API =
     "https://social-chi-amber.vercel.app/api/download";
 
-const UNIVERSAL_TIKTOK_API =
-    "https://universal-dl-one.vercel.app/api/tiktok";
-
-const UNIVERSAL_YOUTUBE_API =
-    "https://universal-dl-one.vercel.app/api/youtube";
+const UNIVERSAL_API =
+    "https://universal-dl-one.vercel.app/api";
 
 
 /* =========================================
@@ -76,14 +74,14 @@ const userArea =
 
 
 /* =========================================
-   STATE
+   CURRENT USER
 ========================================= */
 
 let currentUser = null;
 
 
 /* =========================================
-   AUTH
+   AUTH STATE
 ========================================= */
 
 onAuthStateChanged(auth, (user) => {
@@ -136,12 +134,14 @@ function renderUser(user) {
                                 src="${escapeHTML(photo)}"
                                 alt="User"
                             >
-                          `
+                        `
                         : `
-                            <span class="user-placeholder">
+                            <span
+                                class="user-placeholder"
+                            >
                                 👤
                             </span>
-                          `
+                        `
                 }
 
                 <span>
@@ -182,11 +182,11 @@ function renderUser(user) {
         document.getElementById("logoutButton");
 
 
-    userButton?.addEventListener(
+    userButton.addEventListener(
         "click",
         () => {
 
-            userDropdown?.classList.toggle(
+            userDropdown.classList.toggle(
                 "hidden"
             );
 
@@ -194,13 +194,15 @@ function renderUser(user) {
     );
 
 
-    logoutButton?.addEventListener(
+    logoutButton.addEventListener(
         "click",
         async () => {
 
             try {
 
                 await signOut(auth);
+
+                location.reload();
 
             } catch (error) {
 
@@ -218,7 +220,7 @@ function renderUser(user) {
 
 
 /* =========================================
-   DOWNLOAD BUTTON
+   DOWNLOAD EVENTS
 ========================================= */
 
 downloadButton.addEventListener(
@@ -233,6 +235,8 @@ videoUrlInput.addEventListener(
 
         if (event.key === "Enter") {
 
+            event.preventDefault();
+
             downloadVideo();
 
         }
@@ -242,7 +246,7 @@ videoUrlInput.addEventListener(
 
 
 /* =========================================
-   MAIN DOWNLOAD
+   MAIN DOWNLOAD FUNCTION
 ========================================= */
 
 async function downloadVideo() {
@@ -278,63 +282,75 @@ async function downloadVideo() {
 
     setLoading(true);
 
-    resultSection.classList.add("hidden");
+
+    resultSection.classList.add(
+        "hidden"
+    );
 
 
     try {
 
+        /*
+         * Detect the platform first.
+         */
+
         const platform =
             detectPlatform(url);
+
+
+        console.log(
+            "Detected platform:",
+            platform
+        );
 
 
         let data;
 
 
         /*
-         * TikTok
-         * -------------------------------------
-         * Use Universal DL API.
+         * ================================
+         * TIKTOK
+         * ================================
          */
 
         if (platform === "TikTok") {
 
             data =
-                await fetchTikTok(url);
+                await getTikTok(url);
 
         }
 
 
         /*
-         * YouTube
-         * -------------------------------------
-         * Use Universal DL API.
+         * ================================
+         * YOUTUBE
+         * ================================
          */
 
         else if (platform === "YouTube") {
 
             data =
-                await fetchYouTube(url);
+                await getYouTube(url);
 
         }
 
 
         /*
-         * Instagram / Facebook / X /
-         * Twitch / Pinterest etc.
-         * -------------------------------------
-         * Use your original API.
+         * ================================
+         * OTHER PLATFORMS
+         * ================================
          */
 
         else {
 
             data =
-                await fetchMainAPI(url);
+                await getSocialAPI(url);
 
         }
 
 
         console.log(
-            "Final downloader response:",
+            "Final downloader data:",
             data
         );
 
@@ -348,8 +364,23 @@ async function downloadVideo() {
         }
 
 
+        if (!data.success) {
+
+            throw new Error(
+                data.error ||
+                data.message ||
+                "Unable to process this video."
+            );
+
+        }
+
+
         displayResult(data);
 
+
+        /*
+         * Save history only when logged in.
+         */
 
         await saveDownloadHistory(
             data,
@@ -375,6 +406,7 @@ async function downloadVideo() {
             getFriendlyError(error)
         );
 
+
     } finally {
 
         setLoading(false);
@@ -385,72 +417,158 @@ async function downloadVideo() {
 
 
 /* =========================================
-   MAIN API
+   PLATFORM DETECTION
 ========================================= */
 
-async function fetchMainAPI(url) {
+function detectPlatform(value) {
 
-    const apiURL =
-        `${MAIN_API}?url=${encodeURIComponent(url)}`;
+    try {
+
+        const hostname =
+            new URL(value)
+                .hostname
+                .toLowerCase()
+                .replace(/^www\./, "");
 
 
-    const response =
-        await fetch(apiURL);
+        /*
+         * TikTok
+         */
+
+        if (
+            hostname === "tiktok.com" ||
+            hostname.endsWith(".tiktok.com")
+        ) {
+
+            return "TikTok";
+
+        }
 
 
-    if (!response.ok) {
+        /*
+         * YouTube
+         */
 
-        throw new Error(
-            `Downloader server returned ${response.status}`
-        );
+        if (
+            hostname === "youtube.com" ||
+            hostname === "youtu.be" ||
+            hostname.endsWith(".youtube.com")
+        ) {
+
+            return "YouTube";
+
+        }
+
+
+        /*
+         * Instagram
+         */
+
+        if (
+            hostname === "instagram.com" ||
+            hostname.endsWith(".instagram.com")
+        ) {
+
+            return "Instagram";
+
+        }
+
+
+        /*
+         * Facebook
+         */
+
+        if (
+            hostname === "facebook.com" ||
+            hostname === "fb.watch" ||
+            hostname.endsWith(".facebook.com")
+        ) {
+
+            return "Facebook";
+
+        }
+
+
+        /*
+         * X / Twitter
+         */
+
+        if (
+            hostname === "twitter.com" ||
+            hostname === "x.com" ||
+            hostname.endsWith(".twitter.com") ||
+            hostname.endsWith(".x.com")
+        ) {
+
+            return "X/Twitter";
+
+        }
+
+
+        /*
+         * Twitch
+         */
+
+        if (
+            hostname === "twitch.tv" ||
+            hostname.endsWith(".twitch.tv")
+        ) {
+
+            return "Twitch";
+
+        }
+
+
+        /*
+         * Pinterest
+         */
+
+        if (
+            hostname === "pinterest.com" ||
+            hostname === "pin.it" ||
+            hostname.endsWith(".pinterest.com")
+        ) {
+
+            return "Pinterest";
+
+        }
+
+
+        return "Unknown";
+
+    } catch {
+
+        return "Unknown";
 
     }
-
-
-    const data =
-        await response.json();
-
-
-    if (!data.success) {
-
-        throw new Error(
-            data.error ||
-            data.message ||
-            "Downloader could not process this URL."
-        );
-
-    }
-
-
-    return data;
 
 }
 
 
 /* =========================================
-   TIKTOK
+   TIKTOK API
 ========================================= */
 
-async function fetchTikTok(url) {
+async function getTikTok(url) {
 
-    const apiURL =
-        `${UNIVERSAL_TIKTOK_API}?url=${encodeURIComponent(url)}`;
+    const endpoint =
+        `${UNIVERSAL_API}/tiktok?url=${encodeURIComponent(url)}`;
 
 
     console.log(
         "TikTok API:",
-        apiURL
+        endpoint
     );
 
 
     const response =
-        await fetch(apiURL);
+        await fetch(endpoint);
 
 
     if (!response.ok) {
 
         throw new Error(
-            `TikTok API returned ${response.status}`
+            `TikTok API returned HTTP ${response.status}.`
         );
 
     }
@@ -466,313 +584,170 @@ async function fetchTikTok(url) {
     );
 
 
-    if (
-        !data.status ||
-        !data.result
-    ) {
+    if (!data.status) {
 
         throw new Error(
-            "TikTok API could not process this video."
+            data.message ||
+            "TikTok could not be processed."
         );
 
     }
 
 
     /*
-     * Your TikTok API returns:
+     * Your TikTok response is:
      *
-     * result.result.download
+     * result
+     *   └── result
+     *        └── download
      *
-     * which is another API endpoint.
+     * The download value is NOT the MP4 itself.
+     *
+     * It is another API endpoint which returns/
+     * redirects to the actual video.
      */
 
-    const nestedResult =
-        data.result.result;
+    const downloadURL =
+        data?.result?.result?.download;
 
 
-    if (
-        !nestedResult ||
-        !nestedResult.download
-    ) {
+    if (!downloadURL) {
 
         throw new Error(
-            "TikTok API did not return a download endpoint."
-        );
-
-    }
-
-
-    const resolverURL =
-        nestedResult.download;
-
-
-    console.log(
-        "TikTok resolver:",
-        resolverURL
-    );
-
-
-    /*
-     * Resolve the second API.
-     */
-
-    const resolverResponse =
-        await fetch(resolverURL);
-
-
-    if (!resolverResponse.ok) {
-
-        throw new Error(
-            `TikTok resolver returned ${resolverResponse.status}`
+            "TikTok API did not return a video endpoint."
         );
 
     }
 
 
     /*
-     * Try JSON first.
-     *
-     * Some resolver APIs return JSON containing
-     * the real video URL.
+     * Convert the TikTok API response into the
+     * same format used by your existing UI.
      */
 
-    const contentType =
-        resolverResponse.headers.get(
-            "content-type"
-        ) || "";
+    return {
+
+        success: true,
+
+        platform: "TikTok",
+
+        id: "",
+
+        title:
+            "TikTok Video",
+
+        description:
+            "",
+
+        thumbnail:
+            "",
+
+        duration:
+            null,
+
+        uploader:
+            data.creator ||
+            "TikTok",
+
+        uploader_id:
+            "",
+
+        webpage_url:
+            url,
+
+        original_url:
+            url,
 
 
-    if (
-        contentType.includes(
-            "application/json"
-        )
-    ) {
+        best: {
 
-        const resolved =
-            await resolverResponse.json();
+            format_id:
+                "tiktok-best",
 
+            ext:
+                "mp4",
 
-        console.log(
-            "TikTok resolved response:",
-            resolved
-        );
+            resolution:
+                "Best",
 
-
-        const videoURL =
-            extractVideoURL(resolved);
-
-
-        if (!videoURL) {
-
-            throw new Error(
-                "TikTok resolver did not return a video URL."
-            );
-
-        }
-
-
-        return {
-
-            success: true,
-
-            platform: "TikTok",
-
-            title:
-                resolved.title ||
-                "TikTok Video",
-
-            description:
-                resolved.description ||
-                "",
-
-            thumbnail:
-                resolved.thumbnail ||
-                "",
-
-            duration:
-                resolved.duration ||
+            width:
                 null,
 
-            uploader:
-                resolved.uploader ||
-                resolved.author ||
-                "TikTok",
-
-            best: {
-
-                format_id:
-                    "tiktok",
-
-                ext:
-                    "mp4",
-
-                resolution:
-                    resolved.resolution ||
-                    "Available",
-
-                audio_only:
-                    false,
-
-                video_only:
-                    false,
-
-                download_url:
-                    videoURL
-
-            },
-
-            formats: [
-
-                {
-
-                    format_id:
-                        "tiktok",
-
-                    ext:
-                        "mp4",
-
-                    resolution:
-                        resolved.resolution ||
-                        "Available",
-
-                    audio_only:
-                        false,
-
-                    video_only:
-                        false,
-
-                    download_url:
-                        videoURL
-
-                }
-
-            ]
-
-        };
-
-    }
-
-
-    /*
-     * If the resolver itself responds with
-     * video/mp4, we don't know the final CDN
-     * URL from fetch().
-     *
-     * In that case use the resolver URL as
-     * the browser download endpoint.
-     */
-
-    if (
-        contentType.includes(
-            "video/"
-        )
-    ) {
-
-        return {
-
-            success: true,
-
-            platform: "TikTok",
-
-            title:
-                "TikTok Video",
-
-            description:
-                "",
-
-            thumbnail:
-                "",
-
-            duration:
+            height:
                 null,
 
-            uploader:
-                "TikTok",
+            fps:
+                null,
 
-            best: {
+            filesize:
+                null,
 
-                format_id:
-                    "tiktok",
+            filesize_approx:
+                null,
 
-                ext:
-                    "mp4",
+            vcodec:
+                null,
 
-                resolution:
-                    "Available",
+            acodec:
+                null,
 
-                audio_only:
-                    false,
+            audio_only:
+                false,
 
-                video_only:
-                    false,
+            video_only:
+                false,
 
-                download_url:
-                    resolverURL
+            /*
+             * IMPORTANT:
+             *
+             * This points to:
+             *
+             * tiktock-web.vercel.app/api/
+             * downloadVideo?url=...
+             *
+             * We don't fetch it as JSON.
+             *
+             * We give it to the browser as the
+             * actual video/download endpoint.
+             */
 
-            },
+            download_url:
+                downloadURL
 
-            formats: [
-
-                {
-
-                    format_id:
-                        "tiktok",
-
-                    ext:
-                        "mp4",
-
-                    resolution:
-                        "Available",
-
-                    audio_only:
-                        false,
-
-                    video_only:
-                        false,
-
-                    download_url:
-                        resolverURL
-
-                }
-
-            ]
-
-        };
-
-    }
+        },
 
 
-    throw new Error(
-        "TikTok resolver returned an unsupported response."
-    );
+        formats: []
+
+    };
 
 }
 
 
 /* =========================================
-   YOUTUBE
+   YOUTUBE API
 ========================================= */
 
-async function fetchYouTube(url) {
+async function getYouTube(url) {
 
-    const apiURL =
-        `${UNIVERSAL_YOUTUBE_API}?url=${encodeURIComponent(url)}`;
+    const endpoint =
+        `${UNIVERSAL_API}/youtube?url=${encodeURIComponent(url)}`;
 
 
     console.log(
         "YouTube API:",
-        apiURL
+        endpoint
     );
 
 
     const response =
-        await fetch(apiURL);
+        await fetch(endpoint);
 
 
     if (!response.ok) {
 
         throw new Error(
-            `YouTube API returned ${response.status}`
+            `YouTube API returned HTTP ${response.status}.`
         );
 
     }
@@ -788,26 +763,24 @@ async function fetchYouTube(url) {
     );
 
 
-    if (
-        !data.status ||
-        !data.result
-    ) {
+    if (!data.status) {
 
         throw new Error(
-            "YouTube API could not process this video."
+            data.message ||
+            "YouTube could not be processed."
         );
 
     }
 
 
-    const videoURL =
-        data.result.url;
+    const result =
+        data.result || {};
 
 
-    if (!videoURL) {
+    if (!result.url) {
 
         throw new Error(
-            "YouTube API did not return a download URL."
+            "YouTube API did not return a video URL."
         );
 
     }
@@ -819,8 +792,10 @@ async function fetchYouTube(url) {
 
         platform: "YouTube",
 
+        id: "",
+
         title:
-            data.result.title ||
+            result.title ||
             "YouTube Video",
 
         description:
@@ -833,19 +808,51 @@ async function fetchYouTube(url) {
             null,
 
         uploader:
-            data.result.creator ||
+            result.creator ||
+            data.creator ||
             "YouTube",
+
+        uploader_id:
+            "",
+
+        webpage_url:
+            url,
+
+        original_url:
+            url,
+
 
         best: {
 
             format_id:
-                "youtube",
+                "youtube-best",
 
             ext:
                 "mp4",
 
             resolution:
-                "Available",
+                "Best",
+
+            width:
+                null,
+
+            height:
+                null,
+
+            fps:
+                null,
+
+            filesize:
+                null,
+
+            filesize_approx:
+                null,
+
+            vcodec:
+                null,
+
+            acodec:
+                null,
 
             audio_only:
                 false,
@@ -854,35 +861,12 @@ async function fetchYouTube(url) {
                 false,
 
             download_url:
-                videoURL
+                result.url
 
         },
 
-        formats: [
 
-            {
-
-                format_id:
-                    "youtube",
-
-                ext:
-                    "mp4",
-
-                resolution:
-                    "Available",
-
-                audio_only:
-                    false,
-
-                video_only:
-                    false,
-
-                download_url:
-                    videoURL
-
-            }
-
-        ]
+        formats: []
 
     };
 
@@ -890,181 +874,66 @@ async function fetchYouTube(url) {
 
 
 /* =========================================
-   EXTRACT VIDEO URL
+   EXISTING SOCIAL API
 ========================================= */
 
-function extractVideoURL(data) {
-
-    if (!data) {
-
-        return null;
-
-    }
-
-
-    if (
-        typeof data === "string"
-    ) {
-
-        if (
-            data.startsWith("http")
-        ) {
-
-            return data;
-
-        }
-
-        return null;
-
-    }
-
-
-    const possibleKeys = [
-
-        "url",
-        "download",
-        "download_url",
-        "video",
-        "video_url",
-        "videoUrl",
-        "play",
-        "play_url",
-        "playUrl",
-        "src",
-        "source"
-
-    ];
-
-
-    for (
-        const key of possibleKeys
-    ) {
-
-        if (
-            typeof data[key] === "string" &&
-            data[key].startsWith("http")
-        ) {
-
-            return data[key];
-
-        }
-
-    }
-
+async function getSocialAPI(url) {
 
     /*
-     * Search nested objects.
+     * IMPORTANT:
+     *
+     * Don't put "?url=" inside SOCIAL_API.
+     *
+     * The correct URL is:
+     *
+     * /api/download?url=ENCODED_URL
      */
 
-    for (
-        const value of Object.values(data)
-    ) {
-
-        if (
-            value &&
-            typeof value === "object"
-        ) {
-
-            const found =
-                extractVideoURL(value);
+    const endpoint =
+        `${SOCIAL_API}?url=${encodeURIComponent(url)}`;
 
 
-            if (found) {
-
-                return found;
-
-            }
-
-        }
-
-    }
+    console.log(
+        "Social API:",
+        endpoint
+    );
 
 
-    return null;
-
-}
-
-
-/* =========================================
-   DETECT PLATFORM
-========================================= */
-
-function detectPlatform(url) {
-
-    const hostname =
-        new URL(url)
-            .hostname
-            .toLowerCase();
+    const response =
+        await fetch(endpoint);
 
 
-    if (
-        hostname.includes("tiktok.com")
-    ) {
+    if (!response.ok) {
 
-        return "TikTok";
+        throw new Error(
+            `Downloader API returned HTTP ${response.status}.`
+        );
 
     }
 
 
-    if (
-        hostname.includes("youtube.com") ||
-        hostname.includes("youtu.be")
-    ) {
-
-        return "YouTube";
-
-    }
+    const data =
+        await response.json();
 
 
-    if (
-        hostname.includes("instagram.com")
-    ) {
-
-        return "Instagram";
-
-    }
+    console.log(
+        "Social API response:",
+        data
+    );
 
 
-    if (
-        hostname.includes("facebook.com") ||
-        hostname.includes("fb.watch")
-    ) {
+    if (!data.success) {
 
-        return "Facebook";
+        throw new Error(
+            data.error ||
+            data.message ||
+            "Unable to process this URL."
+        );
 
     }
 
 
-    if (
-        hostname.includes("twitter.com") ||
-        hostname.includes("x.com")
-    ) {
-
-        return "X";
-
-    }
-
-
-    if (
-        hostname.includes("twitch.tv")
-    ) {
-
-        return "Twitch";
-
-    }
-
-
-    if (
-        hostname.includes("pinterest.com") ||
-        hostname.includes("pin.it")
-    ) {
-
-        return "Pinterest";
-
-    }
-
-
-    return "Unknown";
+    return data;
 
 }
 
@@ -1080,6 +949,10 @@ function displayResult(data) {
     );
 
 
+    /*
+     * Thumbnail
+     */
+
     videoThumbnail.src =
         data.thumbnail || "";
 
@@ -1093,33 +966,68 @@ function displayResult(data) {
         };
 
 
+    /*
+     * Title
+     */
+
     videoTitle.textContent =
         data.title ||
         "Untitled video";
 
+
+    /*
+     * Description
+     */
 
     videoDescription.textContent =
         data.description ||
         "No description available.";
 
 
+    /*
+     * Uploader
+     */
+
     videoUploader.textContent =
         `👤 ${data.uploader || "Unknown"}`;
 
 
-    videoDuration.textContent =
-        data.duration
-            ? `⏱ ${formatDuration(data.duration)}`
-            : "⏱ Unknown";
+    /*
+     * Duration
+     */
 
+    if (data.duration) {
+
+        videoDuration.textContent =
+            `⏱ ${formatDuration(data.duration)}`;
+
+    } else {
+
+        videoDuration.textContent =
+            "⏱ Unknown";
+
+    }
+
+
+    /*
+     * Platform
+     */
 
     platformBadge.textContent =
         data.platform ||
         "Video";
 
 
+    /*
+     * Clear previous formats
+     */
+
     formatList.innerHTML = "";
 
+
+    /*
+     * Best format first
+     */
 
     if (
         data.best &&
@@ -1134,6 +1042,10 @@ function displayResult(data) {
     }
 
 
+    /*
+     * Other formats
+     */
+
     if (
         Array.isArray(data.formats)
     ) {
@@ -1142,7 +1054,10 @@ function displayResult(data) {
             new Set();
 
 
-        if (data.best?.download_url) {
+        if (
+            data.best &&
+            data.best.download_url
+        ) {
 
             seen.add(
                 data.best.download_url
@@ -1156,7 +1071,8 @@ function displayResult(data) {
         ) {
 
             if (
-                !format?.download_url
+                !format ||
+                !format.download_url
             ) {
 
                 continue;
@@ -1189,6 +1105,32 @@ function displayResult(data) {
 
     }
 
+
+    /*
+     * If no formats were returned.
+     */
+
+    if (
+        !data.best?.download_url &&
+        !data.formats?.length
+    ) {
+
+        formatList.innerHTML = `
+            <div class="format-item">
+                <div class="format-info">
+                    <strong>
+                        No downloadable format
+                    </strong>
+
+                    <span>
+                        The server did not provide a video URL.
+                    </span>
+                </div>
+            </div>
+        `;
+
+    }
+
 }
 
 
@@ -1209,15 +1151,23 @@ function addFormatButton(
         "format-item";
 
 
+    /*
+     * Resolution
+     */
+
     const resolution =
         format.resolution ||
         (
             format.width &&
             format.height
                 ? `${format.width}x${format.height}`
-                : "Available"
+                : "Best"
         );
 
+
+    /*
+     * Type
+     */
 
     const type =
         format.audio_only
@@ -1227,9 +1177,15 @@ function addFormatButton(
                 : "Video";
 
 
+    /*
+     * Size
+     */
+
     const size =
         format.filesize
-            ? formatBytes(format.filesize)
+            ? formatBytes(
+                format.filesize
+            )
             : "";
 
 
@@ -1238,16 +1194,20 @@ function addFormatButton(
         <div class="format-info">
 
             <strong>
-                ${escapeHTML(resolution)}
+                ${escapeHTML(
+                    resolution
+                )}
             </strong>
 
             <span>
                 ${escapeHTML(type)}
+
                 ${
                     size
                         ? ` • ${escapeHTML(size)}`
                         : ""
                 }
+
                 ${
                     isBest
                         ? " • Recommended"
@@ -1287,13 +1247,15 @@ function addFormatButton(
     );
 
 
-    formatList.appendChild(item);
+    formatList.appendChild(
+        item
+    );
 
 }
 
 
 /* =========================================
-   FILE DOWNLOAD
+   ACTUAL DOWNLOAD
 ========================================= */
 
 function downloadFile(
@@ -1313,9 +1275,20 @@ function downloadFile(
 
 
     /*
-     * Open the already-resolved video
-     * endpoint/CDN URL.
+     * IMPORTANT:
+     *
+     * TikTok's URL is an API endpoint that
+     * redirects/serves the actual MP4.
+     *
+     * YouTube's URL is also a video endpoint.
+     *
+     * Therefore DO NOT do:
+     *
+     * fetch(url).then(response.json())
+     *
+     * because the response is VIDEO, not JSON.
      */
+
 
     const link =
         document.createElement("a");
@@ -1324,19 +1297,30 @@ function downloadFile(
     link.href =
         url;
 
+
     link.target =
         "_blank";
 
+
     link.rel =
         "noopener noreferrer";
+
+
+    /*
+     * Ask browser to download.
+     */
 
     link.download =
         `SocialDL.${extension}`;
 
 
-    document.body.appendChild(link);
+    document.body.appendChild(
+        link
+    );
+
 
     link.click();
+
 
     link.remove();
 
@@ -1344,13 +1328,20 @@ function downloadFile(
 
 
 /* =========================================
-   SAVE HISTORY
+   SAVE DOWNLOAD HISTORY
 ========================================= */
 
 async function saveDownloadHistory(
     data,
     originalURL
 ) {
+
+    /*
+     * Downloads work without login.
+     *
+     * History is only stored when a user
+     * is authenticated.
+     */
 
     if (!currentUser) {
 
@@ -1398,6 +1389,7 @@ async function saveDownloadHistory(
 
         );
 
+
     } catch (error) {
 
         console.error(
@@ -1411,14 +1403,15 @@ async function saveDownloadHistory(
 
 
 /* =========================================
-   CLEAR
+   CLEAR BUTTON
 ========================================= */
 
 clearButton.addEventListener(
     "click",
     () => {
 
-        videoUrlInput.value = "";
+        videoUrlInput.value =
+            "";
 
         resultSection.classList.add(
             "hidden"
@@ -1606,7 +1599,9 @@ function formatBytes(
     ];
 
 
-    let index = 0;
+    let index =
+        0;
+
 
     let value =
         Number(bytes);
@@ -1625,7 +1620,8 @@ function formatBytes(
 
 
     return (
-        `${value.toFixed(1)} ${units[index]}`
+        `${value.toFixed(1)} ` +
+        `${units[index]}`
     );
 
 }
@@ -1684,8 +1680,8 @@ function getFriendlyError(
 
         return (
             "Could not connect to the downloader API. " +
-            "The API may be blocking browser requests with CORS. " +
-            "If it works directly in Chrome, the API should be called from your backend instead."
+            "If the API works in Chrome but not here, " +
+            "the API may not allow browser CORS requests."
         );
 
     }
@@ -1696,8 +1692,20 @@ function getFriendlyError(
     ) {
 
         return (
-            "Downloader endpoint returned 404. " +
-            "Check the API URL and query parameter."
+            "Downloader API endpoint returned 404. " +
+            "Check the API URL and request format."
+        );
+
+    }
+
+
+    if (
+        message.includes("429")
+    ) {
+
+        return (
+            "Too many requests. Please wait a moment " +
+            "and try again."
         );
 
     }
